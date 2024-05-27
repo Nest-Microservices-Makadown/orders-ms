@@ -1,6 +1,8 @@
 
 ## Microservicio de Orders
 
+Con base de datos Postgres.
+
 Repositorio parte de curso https://www.udemy.com/course/nestjs-microservicios
 del maestro Fernando Herrera.
 EXCELENTE!
@@ -33,6 +35,7 @@ $ npm run start:prod
 
 - https://docs.nestjs.com/recipes/prisma
 - neon.tech (ofrecen bd postgres free tier)
+- https://nats.io/
 
 
 ## Nest License

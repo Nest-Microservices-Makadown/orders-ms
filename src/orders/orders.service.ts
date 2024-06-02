@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { OrderPaginationDto } from './dto/order-pagination.dto';
 import { ChangeOrderStatusDto } from './dto';
-import { PRODUCT_SERVICE } from 'src/config';
+import { NATS_SERVICE } from 'src/config';
 import { catchError, firstValueFrom } from 'rxjs';
 
 @Injectable()
@@ -12,8 +12,8 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
   private readonly logger = new Logger(OrdersService.name);
 
   constructor(
-    @Inject(PRODUCT_SERVICE)
-    private readonly productClient: ClientProxy) {
+    @Inject(NATS_SERVICE)
+    private readonly natsClient: ClientProxy) {
     super();
   }
 
@@ -27,7 +27,7 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
       const ids = createOrderDto.items.map(item => item.productId);
       // 1. confirm products exist
       const products = await firstValueFrom(
-        this.productClient.send({ cmd: 'validate-products' }, ids)
+        this.natsClient.send('validate-products', ids)
       );
 
       // 2. Estimate values based on products and quantity
@@ -154,7 +154,7 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
         const ids = order.OrderItem.map(orderItem => orderItem.productId);
         // 3. Validate products exist by calling the products microservice
         const products = await firstValueFrom(
-          this.productClient.send({ cmd: 'validate-products' }, ids)
+          this.natsClient.send('validate-products', ids)
         );
         // 4. Add product name to each order item
         return {

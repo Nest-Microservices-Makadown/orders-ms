@@ -5,11 +5,11 @@ import { envs } from './config';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
-  const logger = new Logger('Orders-Microservice');
+  const logger = new Logger('Orders Microservice');
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {
-    transport: Transport.TCP,
+    transport: Transport.NATS,
     options: {
-      port: envs.PORT
+      servers: envs.NATS_SERVERS,
     }
   });
 
@@ -23,6 +23,6 @@ async function bootstrap() {
   await app.listen();
 
   logger.log(`Order microservice ready on port ${envs.PORT}`);
-
+  logger.log(`NATS microservice(s) ready [${envs.NATS_SERVERS}}`);
 }
 bootstrap();

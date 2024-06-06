@@ -6,6 +6,8 @@ import { OrderPaginationDto } from './dto/order-pagination.dto';
 import { ChangeOrderStatusDto } from './dto';
 import { NATS_SERVICE } from 'src/config';
 import { catchError, firstValueFrom } from 'rxjs';
+import { OrderWithProducts } from './interfaces/order-with-products.interface';
+import { PaymentSessionDto } from './dto/payment-session.dto';
 
 @Injectable()
 export class OrdersService extends PrismaClient implements OnModuleInit {
@@ -32,15 +34,15 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
 
       // 2. Estimate values based on products and quantity
       const totalAmount = createOrderDto.items
-      .reduce((acc, orderItem) => {
-        const price = products.find(prod => prod.id === orderItem.productId).price;
-        return acc + price * orderItem.quantity;
-      }, 0);
+        .reduce((acc, orderItem) => {
+          const price = products.find(prod => prod.id === orderItem.productId).price;
+          return acc + price * orderItem.quantity;
+        }, 0);
 
       const totalItems = createOrderDto.items
-      .reduce((acc, orderItem) => {
-        return acc + orderItem.quantity;
-      }, 0);
+        .reduce((acc, orderItem) => {
+          return acc + orderItem.quantity;
+        }, 0);
 
       // 3. Create a database transaction
       const order = await this.order.create({
@@ -57,7 +59,7 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
             }
           }
         },
-        include: { 
+        include: {
           OrderItem: {
             select: {
               price: true,
@@ -76,6 +78,29 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
           productName: products.find(prod => prod.id === orderItem.productId).name
         }))
       };
+    } catch (error) {
+      throw new RpcException(error);
+    }
+  }
+
+  async createPaymentSession(order: OrderWithProducts) {
+    try {
+      let payload: PaymentSessionDto;
+      // convert order to dto structure required by the payment microservice
+      payload = {
+        orderId: order.id,
+        currency: 'mxn',
+        items: order.OrderItem.map(item => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      };
+      const paymentSession = await firstValueFrom(
+          this.natsClient.send('create.payment.session', 
+            payload));
+
+      return paymentSession;
     } catch (error) {
       throw new RpcException(error);
     }
@@ -150,20 +175,20 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
     }
 
     try {
-        // 2. Create an id array from order items
-        const ids = order.OrderItem.map(orderItem => orderItem.productId);
-        // 3. Validate products exist by calling the products microservice
-        const products = await firstValueFrom(
-          this.natsClient.send('validate-products', ids)
-        );
-        // 4. Add product name to each order item
-        return {
-          ...order,
-          OrderItem: order.OrderItem.map(orderItem => ({
-            ...orderItem,
-            productName: products.find(prod => prod.id === orderItem.productId).name
-          }))
-        };
+      // 2. Create an id array from order items
+      const ids = order.OrderItem.map(orderItem => orderItem.productId);
+      // 3. Validate products exist by calling the products microservice
+      const products = await firstValueFrom(
+        this.natsClient.send('validate-products', ids)
+      );
+      // 4. Add product name to each order item
+      return {
+        ...order,
+        OrderItem: order.OrderItem.map(orderItem => ({
+          ...orderItem,
+          productName: products.find(prod => prod.id === orderItem.productId).name
+        }))
+      };
 
     } catch (error) {
       throw new RpcException(error);

@@ -1,9 +1,9 @@
 import { Injectable, OnModuleInit, Logger, HttpStatus, Query, Inject } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { PrismaClient } from '@prisma/client';
+import { OrderStatus, PrismaClient } from '@prisma/client';
 import { ClientProxy, RpcException } from '@nestjs/microservices';
 import { OrderPaginationDto } from './dto/order-pagination.dto';
-import { ChangeOrderStatusDto } from './dto';
+import { ChangeOrderStatusDto, PaidOrderDto } from './dto';
 import { NATS_SERVICE } from 'src/config';
 import { catchError, firstValueFrom } from 'rxjs';
 import { OrderWithProducts } from './interfaces/order-with-products.interface';
@@ -209,5 +209,40 @@ export class OrdersService extends PrismaClient implements OnModuleInit {
       where: { id },
       data: { status }
     });
+  }
+
+  async paidOrder(paidOrderDto: PaidOrderDto) {
+    const { stripePaymentId, orderId, receiptUrl } = paidOrderDto;
+
+    const order = await this.findOne(orderId);
+
+    if (!order) {
+      this.logger.log(`Order does not exist.`);
+      throw new RpcException({
+        message: `Order #${orderId} not found`,
+        status: HttpStatus.BAD_REQUEST
+      });
+    }
+
+    if (order.paid) {
+      this.logger.log(`Order #${orderId} is already paid. No further action required.`);
+      return order;
+    }
+
+    const paidOrder = await this.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.PAID, 
+              paid: true,
+              stripeChargeId: stripePaymentId,
+              // put here the related entity
+              OrderReceipt: {
+                create: {
+                  receiptUrl
+                }
+              }
+            }
+    });
+
+    return paidOrder;
   }
 }

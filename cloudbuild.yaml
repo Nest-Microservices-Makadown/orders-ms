@@ -1,20 +1,22 @@
 steps:
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "build",
-        "-t",
-        "us-west2-docker.pkg.dev/productos-microservices/image-registy/orders-ms",
-        "-f",
-        "dockerfile.prod",
-        "--platform=linux/amd64",
-        ".",
-      ]
-  - name: "gcr.io/cloud-builders/docker"
-    args:
-      [
-        "push",
-        "us-west2-docker.pkg.dev/productos-microservices/image-registy/orders-ms",
-      ]
+- name: 'gcr.io/cloud-builders/docker'
+  entrypoint: 'bash'
+  args:
+    - -c
+    - |
+      docker build -t us-west2-docker.pkg.dev/productos-microservices/image-registy/orders-ms -f dockerfile.prod --platform=linux/amd64 --build-arg ORDERS_DATABASE_URL=$$DATABASE_URL .
+  secretEnv: ['DATABASE_URL']
+
+- name: 'gcr.io/cloud-builders/docker'
+  args:
+    [
+      'push',
+      'us-west2-docker.pkg.dev/productos-microservices/image-registy/orders-ms',
+    ]
 options:
-  logging: CLOUD_LOGGING_ONLY  
+  logging: CLOUD_LOGGING_ONLY
+  
+availableSecrets:
+  secretManager:
+  - versionName: projects/527974893567/secrets/orders_database_url/versions/1
+    env: 'DATABASE_URL'
